@@ -1,0 +1,44 @@
+name: poc-app-review
+
+# Marketplace listing approve count 検証用 workflow（ref hirokimry/vibehawk#136）
+#
+# 目的:
+#   Marketplace listed (Verified なし) の App credentials で APPROVED を post し、
+#   それが PR の reviewDecision に count されるかを実測する。
+#
+# トリガー:
+#   - pull_request (opened / synchronize / reopened): PR が立つたび自動 approve
+#   - workflow_dispatch: 手動再発火用（pr_number 必須）
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'APPROVE 対象の PR 番号'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: App installation token を取得
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.VIBEHAWK_APP_ID }}
+          private-key: ${{ secrets.VIBEHAWK_PRIVATE_KEY }}
+
+      - name: PR を APPROVE
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          gh api -X POST "/repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+            -f event="APPROVE" \
+            -f body="Marketplace listing approve count 検証 PoC (ref hirokimry/vibehawk#136)"
